@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PM Report Approval</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .required { color: #e74c3c; }
+        select, input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 PM Report Approval</h1>
+        <p class="subtitle">Please review and submit your approval</p>
+        
+        <div class="warning">
+            ⚠️ This link expires in 24 hours and can only be used once
+        </div>
+        
+        <div class="success" id="successMsg">✅ Your approval has been submitted successfully!</div>
+        <div class="error" id="errorMsg">❌ <span id="errorText">Something went wrong.</span></div>
+        
+        <form id="approvalForm">
+            <input type="hidden" id="groupID" name="groupID">
+            <input type="hidden" id="token" name="token">
+            
+            <div class="form-group">
+                <label>Approval Status <span class="required">*</span></label>
+                <select id="approved" name="approved" required>
+                    <option value="">-- Select --</option>
+                    <option value="true">✅ Approve</option>
+                    <option value="false">❌ Reject</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="nextPMDate">Next PM Date <span class="required">*</span></label>
+                <input type="date" id="nextPMDate" name="nextPMDate" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="reviewedBy">Your Email <span class="required">*</span></label>
+                <input type="email" id="reviewedBy" name="reviewedBy" placeholder="your.email@company.com" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="comments">Comments (Optional)</label>
+                <textarea id="comments" name="comments" placeholder="Add any notes or observations..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">Submit Review</button>
+        </form>
+    </div>
+
+    <script>
+        // IMPORTANT: Replace with your actual n8n webhook URL
+        const WEBHOOK_URL = 'https://pengr3.app.n8n.cloud/webhook/review-approval';
+
+        // Get parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const groupID = urlParams.get('groupID');
+        const token = urlParams.get('token');
+        
+        // Validate required parameters
+        if (!groupID || !token) {
+            document.getElementById('errorText').textContent = '🚫 Invalid approval link. Missing required parameters.';
+            document.getElementById('errorMsg').style.display = 'block';
+            document.getElementById('approvalForm').style.display = 'none';
+        } else {
+            document.getElementById('groupID').value = groupID;
+            document.getElementById('token').value = token;
+        }
+
+        // Set minimum date to today
+        document.getElementById('nextPMDate').min = new Date().toISOString().split('T')[0];
+
+        // Form submission
+        document.getElementById('approvalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            // Convert approved to boolean
+            data.approved = data.approved === 'true';
+            
+            try {
+                // Send to webhook with token in URL
+                const response = await fetch(`${WEBHOOK_URL}?token=${data.token}&groupID=${data.groupID}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const responseText = await response.text();
+
+                if (response.ok) {
+                    document.getElementById('successMsg').style.display = 'block';
+                    document.getElementById('approvalForm').style.display = 'none';
+                    setTimeout(() => {
+                        window.close();
+                        window.location.href = 'about:blank';
+                    }, 3000);
+                } else {
+                    throw new Error(responseText || 'Submission failed');
+                }
+            } catch (error) {
+                let errorMessage = 'Failed to submit. Please try again.';
+                
+                if (error.message.includes('ALREADY USED')) {
+                    errorMessage = '🚫 This approval link has already been used.';
+                } else if (error.message.includes('EXPIRED')) {
+                    errorMessage = '🚫 This approval link has expired (24 hour limit).';
+                } else if (error.message.includes('INVALID')) {
+                    errorMessage = '🚫 This approval link is not valid.';
+                }
+                
+                document.getElementById('errorText').textContent = errorMessage;
+                document.getElementById('errorMsg').style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Review';
+            }
+        });
+    </script>
+</body>
+</html>
