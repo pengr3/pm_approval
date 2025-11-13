@@ -163,7 +163,7 @@
                 </select>
             </div>
             
-            <div class="form-group">
+            <div class="form-group" id="nextPMDateGroup">
                 <label for="nextPMDate">Next PM Date <span class="required">*</span></label>
                 <input type="date" id="nextPMDate" name="nextPMDate" required>
             </div>
@@ -197,10 +197,12 @@
         const urlParams = new URLSearchParams(window.location.search);
         const groupID = urlParams.get('groupID');
         const token = urlParams.get('token');
+        const taskID = urlParams.get('taskID');
         
         console.log('Page loaded');
         console.log('GroupID from URL:', groupID);
         console.log('Token from URL:', token);
+        console.log('TaskID from URL:', taskID);
         
         if (!groupID || !token) {
             console.error('Missing parameters!');
@@ -210,7 +212,15 @@
         } else {
             document.getElementById('groupID').value = groupID;
             document.getElementById('token').value = token;
-            console.log('Form initialized with:', { groupID, token });
+            
+            // Hide Next PM Date field if not Maintenance task
+            if (taskID !== 'Maintenance') {
+                const nextPMDateGroup = document.getElementById('nextPMDateGroup');
+                nextPMDateGroup.style.display = 'none';
+                document.getElementById('nextPMDate').removeAttribute('required');
+            }
+            
+            console.log('Form initialized with:', { groupID, token, taskID });
         }
 
         document.getElementById('nextPMDate').min = new Date().toISOString().split('T')[0];
@@ -308,6 +318,11 @@
             
             // Add signature as base64
             data.signature = canvas.toDataURL('image/png');
+            
+            // Set nextPMDate to null if not Maintenance task
+            if (taskID !== 'Maintenance') {
+                data.nextPMDate = null;
+            }
             
             const url = `${WEBHOOK_URL}?token=${data.token}&groupID=${data.groupID}`;
             
